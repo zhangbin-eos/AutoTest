@@ -118,6 +118,7 @@ def openlogfile(logfilepath):
 
 
 
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -146,55 +147,76 @@ if __name__ == '__main__':
 
     Cmdlist=ExcelObj.SheetToList("CMD")
 
-    for iter in Cmdlist:
-        if not iter["port"] in PortList:
-            raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter["port"]));
-        config=PortList[iter["port"]]["config"];
-        
-        if PortList[iter["port"]]["type"]=='uart':
-            if not "PortHandle" in PortList[iter["port"]]:
-                PortHandle=serial.Serial(str(config['port'][0]));
-                PortList[iter["port"]]["PortHandle"]=PortHandle;
-                print("open {0} baud {1}".format(str(config['port'][0]),int(config['baud'][0])));
+    while True:
 
-            PortHandle=PortList[iter["port"]]["PortHandle"];
-            PortHandle.baudrate=int(config['baud'][0]);
-            # 如果字符串中有<HEX>标记,表示后面的数据发送使用HEX
-            SendByteData=iter['send'].replace('<CR>','\r').replace('<LF>','\n').encode();
-            ExceptRcvdByteData=iter['rcvd'].encode()
+        for iter in Cmdlist:
+            if not iter["port"] in PortList:
+                raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter["port"]));
+            config=PortList[iter["port"]]["config"];
+            
+            if PortList[iter["port"]]["type"]=='uart':
+                if not "PortHandle" in PortList[iter["port"]]:
+                    PortHandle=serial.Serial(str(config['port'][0]));
+                    PortHandle.baudrate=115200;
+                    PortHandle.bytesize=int(config['databits'][0])
+                    PortHandle.stopbits=int(config['stopbits'][0]);
+                    PortHandle.parity=serial.PARITY_NONE;
+                    PortHandle.xonxoff=False;
+                    PortHandle.rtscts=False;
+                    PortHandle.dsrdtr=False;
 
-            PortHandle.write(SendByteData);
-            logmsg="send to {0}:{1}".format(iter["port"],SendByteData);
-            logger.info(logmsg);
-            print(logmsg);
+                    PortList[iter["port"]]["PortHandle"]=PortHandle;
+                    print("open {0} baud {1}".format(str(config['port'][0]),int(config['baud'][0])));
+                    del PortHandle
 
-            PortHandle.timeout=float(iter['timeout']); 
-            PortHandle.inter_byte_timeout=float(iter['timeout']);
-            RcvdByteData=PortHandle.read_until(b'\r');
-            if(len(RcvdByteData)==0):
-                logmsg="rcvd from {0}:timeout({1})s".format(iter["port"],float(iter['timeout']));
-                logger.error(logmsg);
-            else:
-                if RcvdByteData.find(ExceptRcvdByteData)==-1:
-                    logmsg='rcvd from {0}: "{1}",but except "{2}"'.format(iter["port"],RcvdByteData,ExceptRcvdByteData);
+                PortHandle=PortList[iter["port"]]["PortHandle"];
+                PortHandle.timeout=float(iter['timeout']); 
+                PortHandle.inter_byte_timeout=0.5;
+
+                # 如果字符串中有<HEX>标记,表示后面的数据发送使用HEX
+                SendByteData=iter['send'].replace('<CR>','\r').replace('<LF>','\n').encode();
+                ExceptRcvdByteData=iter['rcvd'].encode()
+                PortHandle.flush()
+                PortHandle.reset_input_buffer()
+                PortHandle.reset_output_buffer()
+                PortHandle.write(SendByteData);
+                logmsg="send to {0}:{1}".format(iter["port"],SendByteData);
+                logger.info(logmsg);
+                print(logmsg);
+
+
+                RcvdByteData=PortHandle.read_until(b'\n');
+                if(len(RcvdByteData)==0):
+                    logmsg="rcvd from {0}:timeout({1})s".format(iter["port"],float(iter['timeout']));
                     logger.error(logmsg);
                 else:
-                    logmsg="rcvd from {0}:{1}".format(iter["port"],RcvdByteData);
-                    logger.info(logmsg);
-            print(logmsg);
-        elif PortList[iter["port"]]["type"]=='tcp':
-            print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
-        elif PortList[iter["port"]]["type"]=='udp':
-            print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
-        elif PortList[iter["port"]]["type"]=='http':
-            print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
-        time.sleep(float(iter['wait']))
-    #end
+                    if RcvdByteData.find(ExceptRcvdByteData)==-1:
+                        logmsg='rcvd from {0}: "{1}",but except "{2}"'.format(iter["port"],RcvdByteData,ExceptRcvdByteData);
+                        logger.error(logmsg);
+                    else:
+                        logmsg="rcvd from {0}:{1}".format(iter["port"],RcvdByteData);
+                        logger.info(logmsg);
+                print(logmsg);
+                del PortHandle
+            elif PortList[iter["port"]]["type"]=='tcp':
+                print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
+            elif PortList[iter["port"]]["type"]=='udp':
+                print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
+            elif PortList[iter["port"]]["type"]=='http':
+                print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
+            if str(iter['wait']) != "0":
+                logmsg="wait {0}".format(iter['wait']);
+                print(logmsg);
+                time.sleep(float(iter['wait']))
+        #for end
+    #while end
+
+
     for iter in PortList:
         if "PortHandle" in iter:
             iter["PortHandle"].close();
             print("close {0} ".format(str(iter['port'][0])));
+
     LogF.close()
 
-    input("Enter Key to exit...")
 
