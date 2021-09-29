@@ -1,10 +1,7 @@
 from openpyxl import load_workbook as LoadExcel
 import urllib.parse as urlparse
 
-import logging
-import os
-import argparse
-import sys
+import logging,os,argparse,sys,difflib
 
 class CmdObj:
     def __init__(self,config):
@@ -116,13 +113,84 @@ def openlogfile(logfilepath):
     LogF.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
     logger.addHandler(LogF)
 
+def app_exit(id):
+    logmsg="exit {0}".format(id)
+    logger.info(logmsg);
+    print(logmsg);
+    input("按任意按键退出...")
+    sys.exit(1);
+
+def serial_test(portconfig,cmd):
+    errorflag=False;
+    if not "Handle" in portconfig:
+        Handle=serial.Serial(str(config['port'][0]));
+        Handle.baudrate=115200;
+        Handle.bytesize=int(config['databits'][0])
+        Handle.stopbits=int(config['stopbits'][0]);
+        Handle.parity=serial.PARITY_NONE;
+        Handle.xonxoff=False;
+        Handle.rtscts=False;
+        Handle.dsrdtr=False;
+
+        portconfig["Handle"]=Handle;
+        print("open {0} baud {1}".format(str(config['port'][0]),int(config['baud'][0])));
+        del Handle
+
+    Handle=portconfig["Handle"];
+    Handle.timeout=float(cmd['timeout']); 
+    Handle.inter_byte_timeout=0.5;
+
+    # 如果字符串中有<HEX>标记,表示后面的数据发送使用HEX
+    SendByteData=cmd['send'].replace('<CR>','\r').replace('<LF>','\n').encode();
+    ExceptRcvdByteData=cmd['rcvd'].encode()
+    Handle.flush()
+    Handle.reset_input_buffer()
+    Handle.reset_output_buffer()
+    Handle.write(SendByteData);
+    logmsg="send to {0}:{1}".format(cmd["port"],SendByteData);
+    logger.info(logmsg);
+    print(logmsg);
+
+    RcvdByteData=Handle.read_until(b'\n');
+
+    if(len(RcvdByteData)==0):
+        logmsg="rcvd from {0}:timeout({1})s".format(cmd["port"],float(cmd['timeout']));
+        logger.error(logmsg);
+        errorflag=True;
+    else:
+        if RcvdByteData.find(ExceptRcvdByteData)==-1:
+            #print("".join(list(difflib.Differ().compare(str(ExceptRcvdByteData),str(RcvdByteData)))))
+            #diff=difflib.ndiff(str(ExceptRcvdByteData).splitlines(keepends=True), str(RcvdByteData).splitlines(keepends=True))
+            #print('\n'.join(diff), end="")
+            logmsg='rcvd from {0}: "{1}",but except "{2}"'.format(cmd["port"],RcvdByteData,ExceptRcvdByteData);
+            logger.error(logmsg);
+            errorflag=True;
+        else:
+            logmsg="rcvd from {0}:{1}".format(cmd["port"],RcvdByteData);
+            logger.info(logmsg);
+    print(logmsg);
+
+    if errorflag==True:
+        if(cmd['ignore_error']=="Y" or cmd['ignore_error']=="y"):
+            print("ignore error ");
+        else:
+            app_exit(-1);
+    del Handle
 
 
+def url_test(portconfig,cmd):
+    return;
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-f","--file", type=str,help="input file(.xlsx)")
+    parser.add_argument(
+        "-f",
+        "--file",
+        nargs='?',
+        default=".\\demo\\CMD.xlsx",
+        type=str,
+        help="input file(.xlsx)")
     parser.add_argument(
         "-o",
         "--log",
@@ -147,57 +215,21 @@ if __name__ == '__main__':
 
     Cmdlist=ExcelObj.SheetToList("CMD")
 
+    loopnum=0;
     while True:
+        loopnum=loopnum+1;
 
+        logmsg="loop num {0}".format(loopnum);
+        logger.info(logmsg);
+        print(logmsg);
         for iter in Cmdlist:
+
             if not iter["port"] in PortList:
                 raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter["port"]));
             config=PortList[iter["port"]]["config"];
             
             if PortList[iter["port"]]["type"]=='uart':
-                if not "PortHandle" in PortList[iter["port"]]:
-                    PortHandle=serial.Serial(str(config['port'][0]));
-                    PortHandle.baudrate=115200;
-                    PortHandle.bytesize=int(config['databits'][0])
-                    PortHandle.stopbits=int(config['stopbits'][0]);
-                    PortHandle.parity=serial.PARITY_NONE;
-                    PortHandle.xonxoff=False;
-                    PortHandle.rtscts=False;
-                    PortHandle.dsrdtr=False;
-
-                    PortList[iter["port"]]["PortHandle"]=PortHandle;
-                    print("open {0} baud {1}".format(str(config['port'][0]),int(config['baud'][0])));
-                    del PortHandle
-
-                PortHandle=PortList[iter["port"]]["PortHandle"];
-                PortHandle.timeout=float(iter['timeout']); 
-                PortHandle.inter_byte_timeout=0.5;
-
-                # 如果字符串中有<HEX>标记,表示后面的数据发送使用HEX
-                SendByteData=iter['send'].replace('<CR>','\r').replace('<LF>','\n').encode();
-                ExceptRcvdByteData=iter['rcvd'].encode()
-                PortHandle.flush()
-                PortHandle.reset_input_buffer()
-                PortHandle.reset_output_buffer()
-                PortHandle.write(SendByteData);
-                logmsg="send to {0}:{1}".format(iter["port"],SendByteData);
-                logger.info(logmsg);
-                print(logmsg);
-
-
-                RcvdByteData=PortHandle.read_until(b'\n');
-                if(len(RcvdByteData)==0):
-                    logmsg="rcvd from {0}:timeout({1})s".format(iter["port"],float(iter['timeout']));
-                    logger.error(logmsg);
-                else:
-                    if RcvdByteData.find(ExceptRcvdByteData)==-1:
-                        logmsg='rcvd from {0}: "{1}",but except "{2}"'.format(iter["port"],RcvdByteData,ExceptRcvdByteData);
-                        logger.error(logmsg);
-                    else:
-                        logmsg="rcvd from {0}:{1}".format(iter["port"],RcvdByteData);
-                        logger.info(logmsg);
-                print(logmsg);
-                del PortHandle
+                serial_test(PortList[iter["port"]],iter)
             elif PortList[iter["port"]]["type"]=='tcp':
                 print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
             elif PortList[iter["port"]]["type"]=='udp':
