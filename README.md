@@ -74,3 +74,33 @@ print(response.text)
 
 http 命令的测试,接收部分的判断是根据 待接收部分是否包含在接收数据中进行的.所以可以将接收的数据的头尾去掉,进行匹配
 
+对于一个post命令,使用postman转换后,得到
+```
+import requests
+
+url = "http://192.168.20.196/cgi-bin/ligline.cgi"
+
+payload = "{\"cmd\":\"video_info\"}"
+headers = {
+  'content-type': 'application/json;charset=UTF-8',
+  'accept': 'application/json, text/plain, */*'
+}
+
+response = requests.request("POST", url, headers=headers, data=payload)
+
+print(response.text)
+
+```
+对于的excel中的send数据,如下,注意上方的单引号修改为如下的双引号
+```
+{
+	"methed":"POST",
+	"url" : "/cgi-bin/ligline.cgi",
+	"headers":{
+		"'content-type": "application/json;charset=UTF-8",
+		"accept": "application/json, text/plain, */*"
+	},
+	"payload":"{\"cmd\":\"video_info\"}"
+}
+
+```
