@@ -114,15 +114,15 @@ def openlogfile(logfilepath):
     logger.addHandler(LogF)
 
 def app_exit(id):
-    logmsg="exit {0}".format(id)
+    logmsg='exit {0}'.format(id)
     logger.info(logmsg);
     print(logmsg);
-    input("按任意按键退出...")
+    input('按任意按键退出...')
     sys.exit(1);
 
 def serial_test(portconfig,cmd):
     errorflag=False;
-    if not "Handle" in portconfig:
+    if not 'Handle' in portconfig:
         Handle=serial.Serial(str(config['port'][0]));
         Handle.baudrate=115200;
         Handle.bytesize=int(config['databits'][0])
@@ -132,11 +132,11 @@ def serial_test(portconfig,cmd):
         Handle.rtscts=False;
         Handle.dsrdtr=False;
 
-        portconfig["Handle"]=Handle;
-        print("open {0} baud {1}".format(str(config['port'][0]),int(config['baud'][0])));
+        portconfig['Handle']=Handle;
+        print('open {0} baud {1}'.format(str(config['port'][0]),int(config['baud'][0])));
         del Handle
 
-    Handle=portconfig["Handle"];
+    Handle=portconfig['Handle'];
     Handle.timeout=float(cmd['timeout']); 
     Handle.inter_byte_timeout=0.5;
 
@@ -147,97 +147,119 @@ def serial_test(portconfig,cmd):
     Handle.reset_input_buffer()
     Handle.reset_output_buffer()
     Handle.write(SendByteData);
-    logmsg="send to {0}:{1}".format(cmd["port"],SendByteData);
+    logmsg='send to   {0}:{1}'.format(cmd['port'],SendByteData);
     logger.info(logmsg);
     print(logmsg);
 
     RcvdByteData=Handle.read_until(b'\n');
 
     if(len(RcvdByteData)==0):
-        logmsg="rcvd from {0}:timeout({1})s".format(cmd["port"],float(cmd['timeout']));
+        logmsg='rcvd from {0}:timeout({1})s'.format(cmd['port'],float(cmd['timeout']));
         logger.error(logmsg);
         errorflag=True;
     else:
         if RcvdByteData.find(ExceptRcvdByteData)==-1:
-            #print("".join(list(difflib.Differ().compare(str(ExceptRcvdByteData),str(RcvdByteData)))))
+            #print(''.join(list(difflib.Differ().compare(str(ExceptRcvdByteData),str(RcvdByteData)))))
             #diff=difflib.ndiff(str(ExceptRcvdByteData).splitlines(keepends=True), str(RcvdByteData).splitlines(keepends=True))
-            #print('\n'.join(diff), end="")
-            logmsg='rcvd from {0}: "{1}",but except "{2}"'.format(cmd["port"],RcvdByteData,ExceptRcvdByteData);
+            #print('\n'.join(diff), end='')
+            logmsg='rcvd from {0}: {1},but except {2}'.format(cmd['port'],RcvdByteData,ExceptRcvdByteData);
             logger.error(logmsg);
             errorflag=True;
         else:
-            logmsg="rcvd from {0}:{1}".format(cmd["port"],RcvdByteData);
+            logmsg='rcvd from {0}:{1}'.format(cmd['port'],RcvdByteData);
             logger.info(logmsg);
     print(logmsg);
 
     if errorflag==True:
-        if(cmd['ignore_error']=="Y" or cmd['ignore_error']=="y"):
-            print("ignore error ");
+        if(cmd['ignore_error']=='Y' or cmd['ignore_error']=='y'):
+            print('ignore error ');
         else:
             app_exit(-1);
     del Handle
 
+import json,requests
 
-def url_test(portconfig,cmd):
+def http_test(portconfig,cmd):
+    if type(cmd['send'])==str:
+        cmd['send']=json.loads(cmd['send']);
+    methed=cmd['send']['methed'];
+    url=portconfig['config']['url'] + cmd['send']['url'];
+    payload=cmd['send']['payload'];
+    headers=cmd['send']['headers'];
+    logmsg='send to {0}: url={1}:{2} headers={3} payload={4} '.format(cmd['port'],methed,url,headers,payload);
+    logger.info(logmsg);
+    print(logmsg);
+    response = requests.request(methed, url, headers=headers, data=payload);
+    #print(response.text)
+    if cmd['rcvd'] in response.text:
+        logmsg='rcvd from {0}: {1}'.format(cmd['port'],response.text.encode());
+        logger.info(logmsg);
+    else:
+        logmsg='rcvd from {0}: {1},but except {2}'.format(cmd['port'],response.text.encode(),cmd['rcvd'].encode());
+        logger.info(logmsg);
+    
+    print(logmsg);
+
     return;
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-f",
-        "--file",
+        '-f',
+        '--file',
         nargs='?',
-        default=".\\demo\\CMD.xlsx",
+        default='.\\demo\\CMD.xlsx',
         type=str,
-        help="input file(.xlsx)")
+        help='input file(.xlsx)')
     parser.add_argument(
-        "-o",
-        "--log",
+        '-o',
+        '--log',
         nargs='?',
-        default="log_"+time.strftime("%Y%m%d-%H%M%S",time.localtime(time.time()))+".log",
+        default='log_'+time.strftime('%Y%m%d-%H%M%S',time.localtime(time.time()))+'.log',
         type=str,
-        help="output logfile(.txt)")
-    #parser.add_argument("-v", "--verbosity", help="increase output verbosity")
+        help='output logfile(.txt)')
+    #parser.add_argument('-v', '--verbosity', help='increase output verbosity')
 
     args = parser.parse_args()
     openlogfile(args.log)
 
     if args.file==None:
-        logger.info("input file is None");
-        logger.info("{0}".format(parser.print_help()));
+        logger.info('input file is None');
+        logger.info('{0}'.format(parser.print_help()));
 
     Excelfile=args.file;
     logger.info('open '+Excelfile);
     ExcelObj=ExcelToDict(Excelfile);
 
-    PortList=SheetDatatoPortlist(ExcelObj.SheetToList("Port"));
+    PortList=SheetDatatoPortlist(ExcelObj.SheetToList('Port'));
 
-    Cmdlist=ExcelObj.SheetToList("CMD")
+    Cmdlist=ExcelObj.SheetToList('CMD')
 
     loopnum=0;
     while True:
         loopnum=loopnum+1;
 
-        logmsg="loop num {0}".format(loopnum);
+        logmsg='loop num {0}'.format(loopnum);
         logger.info(logmsg);
         print(logmsg);
         for iter in Cmdlist:
 
-            if not iter["port"] in PortList:
-                raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter["port"]));
-            config=PortList[iter["port"]]["config"];
+            if not iter['port'] in PortList:
+                raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter['port']));
+            config=PortList[iter['port']]['config'];
             
-            if PortList[iter["port"]]["type"]=='uart':
-                serial_test(PortList[iter["port"]],iter)
-            elif PortList[iter["port"]]["type"]=='tcp':
-                print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
-            elif PortList[iter["port"]]["type"]=='udp':
-                print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
-            elif PortList[iter["port"]]["type"]=='http':
-                print("send to",PortList[iter["port"]]["type"],"msg:",iter["send"]);
-            if str(iter['wait']) != "0":
-                logmsg="wait {0}".format(iter['wait']);
+            if PortList[iter['port']]['type']=='uart':
+                serial_test(PortList[iter['port']],iter)
+            elif PortList[iter['port']]['type']=='tcp':
+                print('send to',PortList[iter['port']]['type'],'msg:',iter['send']);
+            elif PortList[iter['port']]['type']=='udp':
+                print('send to',PortList[iter['port']]['type'],'msg:',iter['send']);
+            elif PortList[iter['port']]['type']=='http':
+                http_test(PortList[iter['port']],iter)
+
+            if str(iter['wait']) != '0':
+                logmsg='wait {0}'.format(iter['wait']);
                 print(logmsg);
                 time.sleep(float(iter['wait']))
         #for end
@@ -245,9 +267,9 @@ if __name__ == '__main__':
 
 
     for iter in PortList:
-        if "PortHandle" in iter:
-            iter["PortHandle"].close();
-            print("close {0} ".format(str(iter['port'][0])));
+        if 'PortHandle' in iter:
+            iter['PortHandle'].close();
+            print('close {0} '.format(str(iter['port'][0])));
 
     LogF.close()
 
