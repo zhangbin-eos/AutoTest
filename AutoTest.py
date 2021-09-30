@@ -3,6 +3,10 @@ import urllib.parse as urlparse
 
 import logging,os,argparse,sys,difflib
 
+import  serial
+import  time
+import json,requests
+
 class CmdObj:
     def __init__(self,config):
         return ;
@@ -61,8 +65,6 @@ def SheetDatatoPortlist(PortSheetData):
     return Portlist;
 
 
-import  serial
-import  time
 
 def TestOneCmd(cmdobj,rcvdfunc,sendfunc):
     sendfunc(cmdobj["send"])
@@ -177,7 +179,6 @@ def serial_test(portconfig,cmd):
             app_exit(-1);
     del Handle
 
-import json,requests
 
 def http_test(portconfig,cmd):
     if type(cmd['send'])==str:
@@ -195,6 +196,7 @@ def http_test(portconfig,cmd):
         logmsg='rcvd from {0}: {1}'.format(cmd['port'],response.text.encode());
         logger.info(logmsg);
     else:
+        #print(difflib.HtmlDiff().make_file(cmd['rcvd'],response.text))
         logmsg='rcvd from {0}: {1},but except {2}'.format(cmd['port'],response.text.encode(),cmd['rcvd'].encode());
         logger.info(logmsg);
     
@@ -209,7 +211,7 @@ if __name__ == '__main__':
         '-f',
         '--file',
         nargs='?',
-        default='.\\demo\\CMD.xlsx',
+        #default='.\\demo\\Http_TEST_CMD.xlsx',
         type=str,
         help='input file(.xlsx)')
     parser.add_argument(
@@ -227,7 +229,8 @@ if __name__ == '__main__':
     if args.file==None:
         logger.info('input file is None');
         logger.info('{0}'.format(parser.print_help()));
-
+        sys.exit(1)
+    
     Excelfile=args.file;
     logger.info('open '+Excelfile);
     ExcelObj=ExcelToDict(Excelfile);
