@@ -204,14 +204,24 @@ def http_test(portconfig,cmd):
 
     return;
 
-if __name__ == '__main__':
+# 为了print的时候刷新缓冲
+class ForceRefresh(object):
+   def __init__(self, stream):
+       self.stream = stream
+   def write(self, data):
+       self.stream.write(data)
+       self.stream.flush()
+   def __getattr__(self, attr):
+       return getattr(self.stream, attr)
 
+if __name__ == '__main__':
+    sys.stdout = ForceRefresh(sys.stdout)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-f',
         '--file',
         nargs='?',
-        #default='.\\demo\\Http_TEST_CMD.xlsx',
+        default='.\\demo\\CMD.xlsx',
         type=str,
         help='input file(.xlsx)')
     parser.add_argument(
@@ -264,6 +274,7 @@ if __name__ == '__main__':
             if str(iter['wait']) != '0':
                 logmsg='wait {0}'.format(iter['wait']);
                 print(logmsg);
+                logger.info(logmsg);
                 time.sleep(float(iter['wait']))
         #for end
     #while end
