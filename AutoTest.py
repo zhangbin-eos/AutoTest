@@ -141,7 +141,7 @@ def serial_test(portconfig,cmd):
 
     # 如果字符串中有<HEX>标记,表示后面的数据发送使用HEX
     SendByteData=cmd['send'].replace('<CR>','\r').replace('<LF>','\n').encode()
-    ExceptRcvdByteData=cmd['rcvd'].replace('<CR>','\r').replace('<LF>','\n').encode()
+    
     Handle.flush()
     #Handle.reset_input_buffer()
     #Handle.reset_output_buffer()
@@ -149,7 +149,10 @@ def serial_test(portconfig,cmd):
     logmsg='send to   {0}:{1}'.format(cmd['port'],SendByteData)
     logger.info(logmsg)
     print(logmsg)
-    
+
+    if cmd['rcvd']==None
+    ExceptRcvdByteData=cmd['rcvd'].replace('<CR>','\r').replace('<LF>','\n').encode()
+
     RcvdMatchLen=0;timecnt=0;currentime=time.time();RcvdByteData=b''
     while not (timecnt>float(cmd['timeout']) or RcvdMatchLen==len(ExceptRcvdByteData)) :
         timecnt=time.time()-currentime
@@ -167,13 +170,18 @@ def serial_test(portconfig,cmd):
     if RcvdMatchLen==len(ExceptRcvdByteData):
         logmsg='rcvd from {0}:{1}'.format(cmd['port'],RcvdByteData)
         print(logmsg)
+        logger.info(logmsg)
+    elif timecnt > float(cmd['timeout']):
+        logmsg='rcvd from {0}:timeout({1})s,current rcvd :{2},Except :{3}'.format(cmd['port'],float(cmd['timeout']),RcvdByteData,ExceptRcvdByteData)
+        print(logmsg)
+        logger.error(logmsg)
+        errorflag=True
     else:
-        if timecnt > float(cmd['timeout']):
-            logmsg='rcvd from {0}:timeout({1})s,current rcvd :{2},Except :{3}'.format(cmd['port'],float(cmd['timeout']),RcvdByteData,ExceptRcvdByteData)
-            print(logmsg)
-            logger.error(logmsg)
-            errorflag=True
-    
+        logmsg='rcvd from {0}:timeout({1})s,current rcvd :{2},Except :{3} RcvdMatchLen :{4} '.format(cmd['port'],float(cmd['timeout']),RcvdByteData,ExceptRcvdByteData,RcvdMatchLen)
+        print(logmsg)
+        logger.error(logmsg)
+        errorflag=True
+
     if errorflag==True:
         if(cmd['ignore_error']=='Y' or cmd['ignore_error']=='y'):
             print('ignore error ')
@@ -193,8 +201,11 @@ def http_test(portconfig,cmd):
     logger.info(logmsg)
     print(logmsg)
     try:
+        logging.getLogger("requests").setLevel(logging.WARNING)
         response = requests.request(methed, url, headers=headers, data=payload,timeout=float(cmd['timeout']))
-        if cmd['rcvd'] in response.text:
+        if cmd['rcvd'] == None:
+            print("Don't need check rcvd.")
+        elif cmd['rcvd'] in response.text:
             logmsg='rcvd from {0}: {1}'.format(cmd['port'],response.text.encode())
             logger.info(logmsg)
         else:
@@ -248,7 +259,7 @@ if __name__ == '__main__':
         '-f',
         '--file',
         nargs='?',
-        default='.\\demo\\CMD.xlsx',
+        default='.\\demo\\CMD.xlsx',# for debug
         type=str,
         help='input file(.xlsx)')
     parser.add_argument(
