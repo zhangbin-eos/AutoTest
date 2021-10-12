@@ -7,12 +7,6 @@ import  serial
 import  time
 import json,requests
 
-class CmdObj:
-    def __init__(self,config):
-        return 
-
-
-
 class ExcelToDict:
     def __init__(self,file,title_row=0):
         self.title_row = int(title_row)
@@ -53,8 +47,9 @@ def SheetDatatoPortlist(PortSheetData):
         parsed = urlparse.urlparse(item['config'])
         Portlist[item['vport']]['type']=parsed.scheme
         Portlist[item['vport']]['config']={}
+        
         if parsed.scheme=='uart':
-            print(urlparse.parse_qs(parsed.query))
+            #print(urlparse.parse_qs(parsed.query))
             Portlist[item['vport']]['config'].update(urlparse.parse_qs(parsed.query))
         elif parsed.scheme=='tcp':
             Portlist[item['vport']]['config']['ip']=parsed.netloc
@@ -62,6 +57,7 @@ def SheetDatatoPortlist(PortSheetData):
             Portlist[item['vport']]['config']['ip']=parsed.netloc
         elif parsed.scheme=='http':
             Portlist[item['vport']]['config']['url']=item['config']
+        print(Portlist)
     return Portlist
 
 
@@ -124,6 +120,7 @@ def app_exit(id):
 
 def serial_test(portconfig,cmd):
     errorflag=False
+    config=portconfig['config']
     if not 'Handle' in portconfig:
         Handle=serial.Serial(str(config['port'][0]))
         Handle.baudrate=115200
@@ -221,6 +218,29 @@ class ForceRefresh(object):
    def __getattr__(self, attr):
        return getattr(self.stream, attr)
 
+
+def test_sheet(Cmdlist,PortList):
+    for iter in Cmdlist:
+        if not iter['port'] in PortList:
+            raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter['port']))
+
+        if PortList[iter['port']]['type']=='uart':
+            serial_test(PortList[iter['port']],iter)
+        elif PortList[iter['port']]['type']=='tcp':
+            print('send to',PortList[iter['port']]['type'],'msg:',iter['send'])
+        elif PortList[iter['port']]['type']=='udp':
+            print('send to',PortList[iter['port']]['type'],'msg:',iter['send'])
+        elif PortList[iter['port']]['type']=='http':
+            http_test(PortList[iter['port']],iter)
+
+        logmsg='wait {0}'.format(iter['wait'])
+        print(logmsg)
+        logger.info(logmsg)
+        if str(iter['wait']) != '0':
+            time.sleep(float(iter['wait']))
+    #for end
+    return
+
 if __name__ == '__main__':
     sys.stdout = ForceRefresh(sys.stdout)
     parser = argparse.ArgumentParser()
@@ -253,9 +273,13 @@ if __name__ == '__main__':
     ExcelObj=ExcelToDict(Excelfile)
 
     PortList=SheetDatatoPortlist(ExcelObj.SheetToList('Port'))
-
-    Cmdlist=ExcelObj.SheetToList('CMD')
-
+    CmdSheetList=[]
+    for SheetName in ExcelObj.ExcelBook.sheetnames:
+        if SheetName != 'Port':
+            obj={}
+            obj['name']=SheetName
+            obj['list']=ExcelObj.SheetToList(SheetName)
+            CmdSheetList.append(obj)
     loopnum=0
     while True:
         loopnum=loopnum+1
@@ -263,27 +287,13 @@ if __name__ == '__main__':
         logmsg='loop num {0}'.format(loopnum)
         logger.info(logmsg)
         print(logmsg)
-        for iter in Cmdlist:
 
-            if not iter['port'] in PortList:
-                raise Exception('maybe excel port info err? no found cmd sheet {0} in port sheet'.format(iter['port']))
-            config=PortList[iter['port']]['config']
-            
-            if PortList[iter['port']]['type']=='uart':
-                serial_test(PortList[iter['port']],iter)
-            elif PortList[iter['port']]['type']=='tcp':
-                print('send to',PortList[iter['port']]['type'],'msg:',iter['send'])
-            elif PortList[iter['port']]['type']=='udp':
-                print('send to',PortList[iter['port']]['type'],'msg:',iter['send'])
-            elif PortList[iter['port']]['type']=='http':
-                http_test(PortList[iter['port']],iter)
-
-            logmsg='wait {0}'.format(iter['wait'])
-            print(logmsg)
+        for  Cmdlist in CmdSheetList:
+            logmsg='Test Sheet :{0}'.format(Cmdlist['name'])
             logger.info(logmsg)
-            if str(iter['wait']) != '0':
-                time.sleep(float(iter['wait']))
-        #for end
+            print(logmsg)
+            test_sheet(Cmdlist['list'],PortList)
+        # for end
     #while end
 
     for iter in PortList:
