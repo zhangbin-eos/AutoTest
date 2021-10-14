@@ -151,7 +151,6 @@ def serial_test(portconfig,cmd):
     logger.info(logmsg)
     print(logmsg)
 
-    if cmd['rcvd']==None
     ExceptRcvdByteData=cmd['rcvd'].replace('<CR>','\r').replace('<LF>','\n').encode()
 
     RcvdMatchLen=0;timecnt=0;currentime=time.time();RcvdByteData=b''
