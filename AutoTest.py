@@ -143,7 +143,8 @@ def serial_test(portconfig,cmd):
     SendByteData=cmd['send'].replace('<CR>','\r').replace('<LF>','\n').encode()
     
     Handle.flush()
-    #Handle.reset_input_buffer()
+    # 写数据前先清空下接收buff,防止接收buff中已有待接收数据
+    Handle.reset_input_buffer()
     #Handle.reset_output_buffer()
     Handle.write(SendByteData)
     logmsg='send to   {0}:{1}'.format(cmd['port'],SendByteData)
