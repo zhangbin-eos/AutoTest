@@ -30,11 +30,18 @@ class ExcelToDict:
                     titlelist.append(i.value)
                 continue
 
-            # 读取行里的所有元素
+            # 如果这行不是空行,读取行里的所有元素
+            isUnNone=False
             for i in row:
-                rowsDataObj[titlelist[row.index(i)]]=i.value
-            DataObjList.append(rowsDataObj)
-            self.ExcelDate[SheetName]=DataObjList
+                if i.value != None:
+                    isUnNone=True
+            if isUnNone:
+                for i in row:
+                    rowsDataObj[titlelist[row.index(i)]]=i.value
+                DataObjList.append(rowsDataObj)
+                self.ExcelDate[SheetName]=DataObjList
+            else:
+                continue
         return self.ExcelDate[SheetName]
 
 
